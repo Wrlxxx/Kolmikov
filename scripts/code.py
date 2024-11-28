@@ -1,3 +1,4 @@
+import os
 import sqlite3
 from tabulate import tabulate
 
@@ -42,7 +43,7 @@ def user_info(username, role):
     print(f"Имя пользователя: {username}")
     print(f"Роль: {role}")
 
-def main_menu(db):
+def main_menu(db, user_db):
     """Основное меню для выбора действия."""
     while True:
         print("\n1. Вход")
@@ -53,20 +54,20 @@ def main_menu(db):
         if choice == '1':
             username = input("Введите имя пользователя: ")
             password = input("Введите пароль: ")
-            user = authenticate_user(db, username, password)
+            user = authenticate_user(user_db, username, password)
             if user:
                 display_welcome_message(user[1])
                 if user[3] == 'user':
                     user_menu(db, user[1], user[3])
                 else:
-                    admin_menu(db, user[1], user[3])  # Передаем имя и роль пользователя в admin_menu
+                    admin_menu(db, user[1], user[3])    
             else:
                 print("Неверное имя пользователя или пароль.")
         elif choice == '2':
             username = input("Введите имя пользователя: ")
             password = input("Введите пароль: ")
             role = input("Введите роль: ")
-            register_user(db, username, password, role)
+            register_user(user_db, username, password, role)
         elif choice == '3':
             break
         else:
@@ -82,7 +83,7 @@ def user_menu(db, username, user_role):
         choice = input("Выберите действие: ")
 
         if choice == '1':
-            user_info(username, user_role)  # Передаем имя и роль пользователя
+            user_info(username, user_role)  
         elif choice == '2':
             show_tables(db)
             sql_command = input("Введите команду SELECT * FROM <таблица>: ")
@@ -109,19 +110,19 @@ def admin_menu(db, username, user_role):
         choice = input("Выберите действие: ")
 
         if choice == '1':
-            user_info(username, user_role)  # Передаем имя и роль пользователя
+            user_info(username, user_role)  
         elif choice == '2':
             sql_command = input("\nВведите SQL команду (или 'выход' для выхода): ")
             
             if sql_command.lower() == 'выход':
                 break
             elif sql_command.lower() == 'help':
-                print_help(user_role)  # Передаем роль пользователя в print_help
+                print_help(user_role)  
                 continue
             
             execute_sql_command(db, sql_command)
         elif choice == '3':
-            print_help(user_role)  # Передаем роль пользователя в print_help
+            print_help(user_role)  
         elif choice == '4':
             break
         else:
@@ -172,9 +173,52 @@ def print_help(user_role):
 """
     print(help_text)
 
-if __name__ == "__main__":
-    db = Database("sqlite.db")
+def list_databases(directory):
+    """Возвращает список файлов баз данных в указанной директории."""
+    return [f for f in os.listdir(directory) if f.endswith('.db')]
+
+def select_database(directory):
+    """Позволяет пользователю выбрать базу данных из списка."""
+    databases = list_databases(directory)
+    if not databases:
+        print("В указанной директории нет баз данных.")
+        return None
+
+    print("Доступные базы данных:")
+    for i, db in enumerate(databases, 1):
+        print(f"{i}. {db}")
+
+    choice = input("Выберите базу данных (введите номер): ")
     try:
-        main_menu(db)
-    finally:
-        db.close()
+        choice = int(choice)
+        if 1 <= choice <= len(databases):
+            return os.path.join(directory, databases[choice - 1])
+        else:
+            print("Неверный выбор.")
+            return None
+    except ValueError:
+        print("Пожалуйста, введите число.")
+        return None
+
+def main():
+    while True:
+        base_dir = os.path.dirname(__file__)
+        directory = os.path.join(base_dir, '..', 'alldb')
+        user_db_path = os.path.join(base_dir, '..', 'user', 'users.db')
+
+        db_path = select_database(directory)
+        if db_path:
+            db = Database(db_path)
+            user_db = Database(user_db_path)
+            try:
+                main_menu(db, user_db)
+            finally:
+                db.close()
+                user_db.close()
+        
+        choice = input("Хотите выбрать другую базу данных? (да/нет): ").strip().lower()
+        if choice != 'да':
+            break
+
+if __name__ == "__main__":
+    main()
